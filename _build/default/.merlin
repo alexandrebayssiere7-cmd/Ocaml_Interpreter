@@ -1,0 +1,4 @@
+EXCLUDE_QUERY_DIR
+B _build/default/.kawai.eobjs/byte
+S .
+FLG -open Dune__exe

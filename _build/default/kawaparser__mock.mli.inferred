@@ -1,0 +1,52 @@
+type token =
+    WHILE
+  | VOID
+  | VAR
+  | TRUE
+  | THIS
+  | STAR
+  | SEMI
+  | RPAR
+  | RETURN
+  | REM
+  | PRINT
+  | POINT
+  | PLUS
+  | OR
+  | NEW
+  | NEQ
+  | N
+  | MINUS
+  | METHOD
+  | MAIN
+  | LT
+  | LPAR
+  | LE
+  | INT of int
+  | IF
+  | IDENT of string
+  | GT
+  | GE
+  | FALSE
+  | EXTENDS
+  | EXCL
+  | EQ
+  | EOF
+  | END
+  | ELSE
+  | DIV
+  | COMMA
+  | CLASS
+  | BOOL of bool
+  | BEQ
+  | BEGIN
+  | ATTRIBUTE
+  | AND
+val menhir_begin_marker : int
+val xv_seq : Kawa.seq
+val xv_program : Kawa.program
+val xv_mem_access : Kawa.mem_access
+val xv_list_instr_ : Kawa.seq
+val xv_instr : Kawa.instr
+val xv_expr : Kawa.expr
+val menhir_end_marker : int
