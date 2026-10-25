@@ -1,0 +1,5 @@
+// Le plus petit programme Kawa : un bloc main.
+main {
+  print(42);
+  print(true && !false);
+}

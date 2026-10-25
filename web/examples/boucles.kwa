@@ -1,0 +1,16 @@
+// Variables globales, while et if : calcul de 2^10 par exponentiation rapide.
+var int a;
+var int n;
+var int acc;
+
+main {
+  a = 2;
+  n = 10;
+  acc = 1;
+  while (n != 0) {
+    if (n % 2 == 1) { acc = acc * a; }
+    a = a * a;
+    n = n / 2;
+  }
+  print(acc);
+}

@@ -1,0 +1,28 @@
+// Classe avec attributs, constructeur et méthodes.
+var compte c;
+
+class compte {
+  attribute int solde;
+
+  method void constructor(int depot) {
+    this.solde = depot;
+  }
+
+  method void retirer(int montant) {
+    if (montant <= this.solde) {
+      this.solde = this.solde - montant;
+    }
+  }
+
+  method bool est_vide() {
+    return this.solde == 0;
+  }
+}
+
+main {
+  c = new compte(100);
+  c.retirer(30);
+  c.retirer(500);   // refusé : solde insuffisant
+  print(c.solde);
+  print(c.est_vide());
+}

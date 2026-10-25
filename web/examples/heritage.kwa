@@ -1,0 +1,37 @@
+// Héritage : triple hérite de paire et redéfinit somme().
+var paire p;
+
+class paire {
+  attribute int x;
+  attribute int y;
+
+  method void constructor(int x, int y) {
+    this.x = x;
+    this.y = y;
+  }
+
+  method int somme() {
+    return this.x + this.y;
+  }
+}
+
+class triple extends paire {
+  attribute int z;
+
+  method void constructor(int x, int y, int z) {
+    this.x = x;
+    this.y = y;
+    this.z = z;
+  }
+
+  method int somme() {
+    return this.x + this.y + this.z;
+  }
+}
+
+main {
+  p = new paire(1, 2);
+  print(p.somme());
+  p = new triple(1, 2, 3);  // un triple est aussi une paire
+  print(p.somme());         // appelle la méthode de triple
+}

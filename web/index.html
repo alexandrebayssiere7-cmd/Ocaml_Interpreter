@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kawa Playground</title>
+<meta name="description" content="Apprendre et exécuter Kawa, un petit langage objet inspiré de Java, interprété en OCaml compilé vers JavaScript.">
+<style>
+  :root {
+    --bg: #f7f7f5;
+    --panel: #ffffff;
+    --text: #1d1d1b;
+    --muted: #65655f;
+    --border: #e2e2dc;
+    --accent: #c2410c;
+    --accent-text: #ffffff;
+    --code-bg: #f0efe9;
+    --ok: #15803d;
+    --err: #b91c1c;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161614;
+      --panel: #1f1f1c;
+      --text: #ecebe6;
+      --muted: #a3a29b;
+      --border: #34342f;
+      --accent: #fb923c;
+      --accent-text: #1d1d1b;
+      --code-bg: #2a2a26;
+      --ok: #4ade80;
+      --err: #f87171;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  header {
+    padding: 24px 16px 8px;
+    max-width: 1280px;
+    margin: 0 auto;
+  }
+  h1 { margin: 0; font-size: 1.75rem; }
+  header p { margin: 4px 0 0; color: var(--muted); }
+  main {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    gap: 24px;
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 16px;
+  }
+  @media (max-width: 900px) { main { grid-template-columns: minmax(0, 1fr); } }
+
+  .guide h2 { font-size: 1.15rem; margin: 28px 0 8px; }
+  .guide h2:first-child { margin-top: 0; }
+  .guide p, .guide li { color: var(--text); }
+  code, pre { font-family: var(--mono); font-size: 0.875rem; }
+  :not(pre) > code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+  pre {
+    background: var(--code-bg);
+    padding: 12px 14px;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 8px 0;
+  }
+  table { border-collapse: collapse; width: 100%; font-size: 0.925rem; }
+  td, th { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--border); }
+
+  .playground {
+    position: sticky;
+    top: 16px;
+    align-self: start;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  @media (max-width: 900px) { .playground { position: static; } }
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .toolbar label { color: var(--muted); font-size: 0.9rem; }
+  select, button {
+    font: inherit;
+    font-size: 0.95rem;
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--text);
+  }
+  button.run {
+    margin-left: auto;
+    background: var(--accent);
+    color: var(--accent-text);
+    border-color: var(--accent);
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button.run:disabled { opacity: 0.6; cursor: wait; }
+  button:focus-visible, select:focus-visible, textarea:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  textarea {
+    width: 100%;
+    height: 52vh;
+    min-height: 280px;
+    resize: vertical;
+    padding: 14px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--text);
+    font: 0.9rem/1.55 var(--mono);
+    tab-size: 2;
+  }
+  .output-head { display: flex; justify-content: space-between; color: var(--muted); font-size: 0.9rem; }
+  output {
+    display: block;
+    min-height: 120px;
+    max-height: 30vh;
+    overflow: auto;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    font: 0.9rem/1.55 var(--mono);
+    white-space: pre-wrap;
+  }
+  .status.ok { color: var(--ok); }
+  .status.err { color: var(--err); }
+  .error { color: var(--err); }
+  kbd {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0 4px;
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Kawa Playground</h1>
+  <p>Un petit langage objet inspiré de Java. L'interpréteur est écrit en OCaml et compilé en JavaScript : votre code s'exécute directement dans le navigateur.</p>
+</header>
+
+<main>
+  <article class="guide">
+    <h2>Structure d'un programme</h2>
+    <p>Un programme contient, <strong>dans cet ordre</strong> : les variables globales, les classes, puis le bloc <code>main</code>.</p>
+    <pre>var int x;          // 1. variables globales
+
+class point { ... } // 2. classes
+
+main {              // 3. instructions exécutées
+  x = 42;
+  print(x);
+}</pre>
+
+    <h2>Types</h2>
+    <table>
+      <tr><td><code>int</code></td><td>entier</td></tr>
+      <tr><td><code>bool</code></td><td><code>true</code> ou <code>false</code></td></tr>
+      <tr><td><code>void</code></td><td>absence de valeur (retour de méthode)</td></tr>
+      <tr><td><code>point</code></td><td>nom d'une classe : référence vers un objet</td></tr>
+    </table>
+    <p>Le typage est vérifié <em>avant</em> l'exécution : <code>1 + true</code> est rejeté.</p>
+
+    <h2>Instructions et opérateurs</h2>
+    <pre>x = 3 * (y + 1);
+print(x);
+
+if (x &gt; 10) { print(1); } else { print(0); }
+if (x == 0) { x = 1; }      // else facultatif
+
+while (x &lt; 100) { x = x * 2; }</pre>
+    <table>
+      <tr><td>Arithmétique</td><td><code>+ - * / %</code>, moins unaire <code>-x</code></td></tr>
+      <tr><td>Comparaison</td><td><code>== != &lt; &lt;= &gt; &gt;=</code></td></tr>
+      <tr><td>Logique</td><td><code>&amp;&amp; || !</code></td></tr>
+    </table>
+    <p>Les accolades sont obligatoires. Commentaires : <code>// ...</code> et <code>/* ... */</code>.</p>
+
+    <h2>Classes et objets</h2>
+    <pre>class point {
+  attribute int x;
+  attribute int y;
+
+  method void constructor(int a, int b) {
+    this.x = a;
+    this.y = b;
+  }
+
+  method int somme() {
+    return this.x + this.y;
+  }
+}</pre>
+    <ul>
+      <li><code>new point</code> crée un objet sans appeler de constructeur ; <code>new point(1, 2)</code> appelle <code>constructor</code>.</li>
+      <li><code>this</code> désigne l'objet courant ; on accède aux attributs avec <code>p.x</code> et on appelle une méthode avec <code>p.somme()</code>.</li>
+      <li>Les variables locales se déclarent avec <code>var</code> au début du corps d'une méthode.</li>
+      <li>Une méthode non <code>void</code> doit renvoyer une valeur sur tous les chemins.</li>
+    </ul>
+
+    <h2>Héritage</h2>
+    <pre>class triple extends point {
+  attribute int z;
+
+  method int somme() {        // redéfinition
+    return this.x + this.y + this.z;
+  }
+}</pre>
+    <p>Une classe hérite des attributs et méthodes de son parent. Un objet <code>triple</code> peut être rangé dans une variable de type <code>point</code> ; l'appel de méthode utilise la version de la classe réelle de l'objet.</p>
+  </article>
+
+  <section class="playground" aria-label="Éditeur de code">
+    <div class="toolbar">
+      <label for="examples">Exemple</label>
+      <select id="examples">
+        <option value="bonjour">Bonjour</option>
+        <option value="boucles">Boucles</option>
+        <option value="classes">Classes</option>
+        <option value="heritage">Héritage</option>
+        <option value="recursion">Récursion</option>
+      </select>
+      <button class="run" id="run" type="button">Exécuter <kbd>⌘/Ctrl ↵</kbd></button>
+    </div>
+    <textarea id="code" spellcheck="false" aria-label="Code Kawa" aria-describedby="editor-help"></textarea>
+    <p id="editor-help" hidden>Tab insère une indentation. Appuyez sur Échap puis Tab pour quitter l'éditeur.</p>
+    <div class="output-head"><span>Sortie</span><span class="status" id="status" aria-live="polite"></span></div>
+    <output id="output" for="code"></output>
+  </section>
+</main>
+
+<script>
+  const TIMEOUT_MS = 3000;
+  const code = document.getElementById("code");
+  const output = document.getElementById("output");
+  const status = document.getElementById("status");
+  const runButton = document.getElementById("run");
+  const examples = document.getElementById("examples");
+  let worker = new Worker("worker.js");
+
+  function setStatus(text, kind) {
+    status.textContent = text;
+    status.className = "status " + kind;
+  }
+
+  async function loadExample(name) {
+    try {
+      const response = await fetch("examples/" + name + ".kwa");
+      if (!response.ok) throw new Error(response.status);
+      code.value = await response.text();
+    } catch (e) {
+      code.value = "// Impossible de charger l'exemple (" + e.message + ").";
+    }
+  }
+
+  function run() {
+    runButton.disabled = true;
+    setStatus("exécution…", "");
+    output.textContent = "";
+    const started = performance.now();
+
+    // Une boucle infinie bloquerait le worker : on le remplace après le délai.
+    const timer = setTimeout(() => {
+      worker.terminate();
+      worker = new Worker("worker.js");
+      output.innerHTML = '<span class="error">Délai dépassé (' + TIMEOUT_MS / 1000 + ' s) : boucle infinie ?</span>';
+      setStatus("interrompu", "err");
+      runButton.disabled = false;
+    }, TIMEOUT_MS);
+
+    worker.onmessage = (e) => {
+      clearTimeout(timer);
+      const ms = Math.round(performance.now() - started);
+      output.textContent = e.data.output;
+      if (e.data.error) {
+        const span = document.createElement("span");
+        span.className = "error";
+        span.textContent = e.data.error;
+        output.append(span);
+        setStatus("erreur", "err");
+      } else {
+        setStatus("ok · " + ms + " ms", "ok");
+      }
+      runButton.disabled = false;
+    };
+    worker.postMessage(code.value);
+  }
+
+  // Tab indente ; après Échap, Tab quitte l'éditeur (navigation au clavier).
+  let tabEscapes = false;
+  code.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      tabEscapes = true;
+    } else if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      run();
+    } else if (e.key === "Tab" && !e.shiftKey && !tabEscapes) {
+      e.preventDefault();
+      code.setRangeText("  ", code.selectionStart, code.selectionEnd, "end");
+    }
+    if (e.key !== "Escape") tabEscapes = false;
+  });
+  runButton.addEventListener("click", run);
+  examples.addEventListener("change", () => loadExample(examples.value));
+  loadExample(examples.value);
+</script>
+</body>
+</html>

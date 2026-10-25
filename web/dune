@@ -1,0 +1,5 @@
+(executable
+ (name kawa_web)
+ (modes js)
+ (libraries kawa_lib js_of_ocaml)
+ (promote (until-clean)))

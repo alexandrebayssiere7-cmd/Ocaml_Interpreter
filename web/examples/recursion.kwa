@@ -1,0 +1,19 @@
+// Méthode récursive avec variable locale.
+var maths m;
+
+class maths {
+  method int fact(int n) {
+    var int r;
+    if (n <= 1) {
+      r = 1;
+    } else {
+      r = n * this.fact(n - 1);
+    }
+    return r;
+  }
+}
+
+main {
+  m = new maths;
+  print(m.fact(10));
+}
