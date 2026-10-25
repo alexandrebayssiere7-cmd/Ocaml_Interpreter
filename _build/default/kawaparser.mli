@@ -6,7 +6,9 @@ type token =
   | VOID
   | VAR
   | TRUE
+  | TINT
   | THIS
+  | TBOOL
   | STAR
   | SEMI
   | RPAR
@@ -18,7 +20,6 @@ type token =
   | OR
   | NEW
   | NEQ
-  | N
   | MINUS
   | METHOD
   | MAIN
@@ -40,7 +41,6 @@ type token =
   | DIV
   | COMMA
   | CLASS
-  | BOOL of (bool)
   | BEQ
   | BEGIN
   | ATTRIBUTE

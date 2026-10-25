@@ -12,119 +12,144 @@ let add_env l tenv =
   List.fold_left (fun env (x, t) -> Env.add x t env) tenv l
 
 let typecheck_prog p =
-  let tenv = add_env p.globals Env.empty in
-  let globals_alias = List.fold_right (fun (a, b, _) init -> (a, b) :: init) p.globals [] in
+  let find_class c =
+    match List.find_opt (fun x -> x.class_name = c) p.classes with
+    | Some cl -> cl
+    | None -> error (Printf.sprintf "Class %s does not exist" c)
+  in
+  (* Ancêtres de [c], du parent direct jusqu'à la racine. *)
+  let rec ancestors seen c =
+    match (find_class c).parent with
+    | None -> []
+    | Some s ->
+      if List.mem s seen then
+        error (Printf.sprintf "Inheritance cycle through class %s" s);
+      s :: ancestors (s :: seen) s
+  in
+  let subclass c1 c2 = c1 = c2 || List.mem c2 (ancestors [c1] c1) in
+  let compatible t_actual t_expected =
+    match t_actual, t_expected with
+    | TClass c1, TClass c2 -> subclass c1 c2
+    | _ -> t_actual = t_expected
+  in
+  (* Membres de la classe avant ceux du parent : une redéfinition masque
+     le membre hérité. *)
+  let rec all_attributes c =
+    let cl = find_class c in
+    match cl.parent with
+    | None -> cl.attributes
+    | Some s -> cl.attributes @ all_attributes s
+  in
+  let rec all_methods c =
+    let cl = find_class c in
+    match cl.parent with
+    | None -> cl.methods
+    | Some s -> cl.methods @ all_methods s
+  in
+  let find_method c m =
+    match List.find_opt (fun x -> x.method_name = m) (all_methods c) with
+    | Some f -> f
+    | None -> error (Printf.sprintf "Method %s not found for class %s" m c)
+  in
+  let check_typ = function
+    | TClass c -> ignore (find_class c)
+    | TVoid | TInt | TBool -> ()
+  in
+  let check_decls l = List.iter (fun (_, t) -> check_typ t) l in
 
-  let rec get_attr c =
-    match c.parent with
-    | None -> c.attributes
-    | Some s -> List.sort_uniq compare (c.attributes @ (get_attr (List.find (fun x -> x.class_name = s) p.classes)))
-  in
-  
-  let rec get_meth c =
-    match c.parent with
-    | None -> c.methods
-    | Some s -> List.sort_uniq compare (c.methods @ (get_meth (List.find (fun x -> x.class_name = s) p.classes)))
-  in
   let rec check e typ tenv =
     let typ_e = type_expr e tenv in
-    if typ_e <> typ && not (subclass type_e typ) then type_error typ_e typ
+    if not (compatible typ_e typ) then type_error typ_e typ
 
   and type_expr e tenv = match e with
     | Int _  -> TInt
     | Bool _ -> TBool
     | Unop(Opp, e1) -> check e1 TInt tenv; TInt
     | Unop(Not, e1) -> check e1 TBool tenv; TBool
-    | Binop(And, e1, e2) | Binop(Or, e1, e2) -> check e1 TBool tenv; check e2 TBool tenv; TBool
-    | Binop(Eq, e1, e2) | Binop(Neq, e1, e2) ->
-      (match type_expr e1 tenv with
-        | TInt ->  check e2 TInt tenv; TBool
-        | TBool ->  check e2 TBool tenv; TBool
-        | TClass(c) -> check e2 (TClass(c)) tenv; TBool
-        | TVoid -> check e2 TVoid tenv; TBool)
-    | Binop(Gt, e1, e2) | Binop(Ge, e1, e2) | Binop(Lt, e1, e2) | Binop(Le, e1, e2) ->
+    | Binop((Add | Sub | Mul | Div | Rem), e1, e2) ->
+      check e1 TInt tenv; check e2 TInt tenv; TInt
+    | Binop((Lt | Le | Gt | Ge), e1, e2) ->
       check e1 TInt tenv; check e2 TInt tenv; TBool
-    | Binop(_, e1, e2) -> check e1 TInt tenv; check e2 TInt tenv; TInt (*ca nous laisse ici les binops de + - * / donc que les opp arithmétique*)
-    | This -> Env.find "this" tenv
-    | New(s) -> check_class s [] tenv; TClass(s)
-    | NewCstr(s, args) -> check_class s args tenv;
-                          let cl = List.find (fun x -> x.class_name = s) p.classes in
-                          TClass(cl.class_name)    | Get(m) -> type_mem_access m tenv
-    | MethCall(e1, s, args) -> let t = type_expr e1 tenv in
-                              (match t with
-                              | TClass(c) -> check_mdef c s args tenv;
-                                let cl = List.find (fun x -> x.class_name = c) p.classes in
-                                let m = List.find (fun x -> x.method_name = s) (get_meth cl) in
-                              m.return
-                              | _ -> error (Printf.sprintf "It's not a vailable method"))
-    | _ -> failwith "case not implemented in type_expr"
+    | Binop((And | Or), e1, e2) ->
+      check e1 TBool tenv; check e2 TBool tenv; TBool
+    | Binop((Eq | Neq), e1, e2) ->
+      let t1 = type_expr e1 tenv in
+      let t2 = type_expr e2 tenv in
+      if not (compatible t1 t2 || compatible t2 t1) then type_error t2 t1;
+      TBool
+    | Get m -> type_mem_access m tenv
+    | This ->
+      (match Env.find_opt "this" tenv with
+       | Some t -> t
+       | None -> error "this used outside a method")
+    | New c -> check_typ (TClass c); TClass c
+    | NewCstr(c, args) ->
+      check_args (find_method c "constructor") args tenv; TClass c
+    | MethCall(e1, m, args) ->
+      (match type_expr e1 tenv with
+       | TClass c -> let f = find_method c m in check_args f args tenv; f.return
+       | t -> error (Printf.sprintf "Method %s called on a value of type %s"
+                       m (typ_to_string t)))
+
+  and check_args f args tenv =
+    if List.length args <> List.length f.params then
+      error (Printf.sprintf "Method %s expects %d arguments, got %d"
+               f.method_name (List.length f.params) (List.length args));
+    List.iter2 (fun e (_, t) -> check e t tenv) args f.params
 
   and type_mem_access m tenv = match m with
-    | Var(s) -> let t = Env.find_opt s tenv in
-                (match t with
-                | Some(v) -> v
-                | None -> error (Printf.sprintf "Variable %s does not exist" s))
-    | Field(e, s) -> (match type_expr e tenv with
-                | TClass(c) -> let cl = List.find (fun x -> x.class_name = c) p.classes in
-                              if not (List.mem s (List.map fst (get_attr cl))) then error (Printf.sprintf "Attribute %s is not defined for class %s" s cl.class_name);
-                              snd (List.find (fun x -> fst x = s) (get_attr cl))
-                | _ -> error (Printf.sprintf "Method %s is not applied to a class" s))
-    | _ -> failwith "case not implemented in type_mem_access"
-    and check_parent c =
-      match c.parent with
-        | None -> ()
-        | Some s -> if not (List.exists (fun x -> x.class_name = s) p.classes) then error (Printf.sprintf "The class %s extended by %s doesn't exist" s c.class_name);
-          if match (List.find (fun x -> x.class_name = s) p.classes).parent with | None -> false | Some s -> s = c.class_name then error (Printf.sprintf "The class %s extended by %s also extends %s" s c.class_name c.class_name)
-    and check_class c args tenv =
-      let cl = List.find_opt (fun x -> x.class_name = c) p.classes in
-      match cl with
-      | None -> error (Printf.sprintf "Class %s does not exist" c)
-      | Some cl -> (check_parent cl;
-        match args with
-        | [] -> ()
-        | _ -> let attr = List.map snd (get_attr (List.find (fun x -> x.class_name = c) p.classes)) in
-             let args = List.map (fun a -> type_expr a tenv) args in
-             if attr <> args then error (Printf.sprintf "Wrong number of arguments in class %s" cl.class_name))
-    
-    and check_mdef c m args tenv =
-      let cl = List.find (fun x -> x.class_name = c) p.classes in
-      if not (List.mem m (List.map (fun a -> a.method_name) (get_meth cl))) then error (Printf.sprintf "Method %s not found for class %s" m cl.class_name);
-      let m = List.find (fun x -> x.method_name = m) (get_meth cl) in
-      let () = if not (List.exists (fun i -> match i with | Return(_) -> true | _ -> false) m.code) && (m.return <> TVoid) then error (Printf.sprintf "Method %s should return a value of type %s" m.method_name (typ_to_string m.return)) in
-      let tenv' = List.fold_left (fun init (s, t) -> Env.add s t init) Env.empty globals_alias in
-      let tenv' = List.fold_left (fun init (s, t) -> Env.add s t init) tenv' m.params in
-      let tenv' = List.fold_left (fun init (s, t) -> Env.add s t init) tenv' (List.fold_right (fun (a, b, _) init -> (a, b) :: init) m.locals []) in
-      let tenv' = Env.add "this" (TClass(cl.class_name)) tenv' in
-      let () = List.iter (fun i -> match i with | Return(e) -> check e m.return tenv' | _ -> ()) m.code in
-      let attr = List.map snd m.params in
-      let args = List.map (fun a -> type_expr a tenv) args in
-      if attr <> args then error (Printf.sprintf "Wrong number of arguments in method %s from class %s" m.method_name cl.class_name)
-    in
-    let rec check_type_extend tm e tenv =
-      let te = type_expr e tenv in
-      match te with
-      | TClass(c) -> if te = tm then () else
-                    let c = List.find (fun x -> x.class_name = c) p.classes in
-                    (match c.parent with
-                    | None -> type_error tm te
-                    | Some s -> let parent = (List.find (fun x -> x.class_name = s) p.classes) in check_type_extend tm (New parent.class_name) tenv)
-      | _ -> check e tm tenv
-      in
-  
-    let rec check_instr i ret tenv = match i with
-      | Print e -> ()
-      | Set (m, e) -> let tm = type_mem_access m tenv in
-                      check_type_extend tm e tenv
-      | If (e, s1, s2) -> check e TBool tenv;
-                          check_seq s1 ret tenv;
-                          check_seq s2 ret tenv
-      | While (e, s) -> check e TBool tenv;
-                        check_seq s ret tenv
-      | Return e -> check e ret tenv
-      | Expr e -> check e ret tenv
-      | Assert e -> check e TBool tenv
-    and check_seq s ret tenv =
-      List.iter (fun i -> check_instr i ret tenv) s
-    in
-  check_seq p.main TVoid tenv ; check_globals p.globals tenv
+    | Var x ->
+      (match Env.find_opt x tenv with
+       | Some t -> t
+       | None -> error (Printf.sprintf "Variable %s does not exist" x))
+    | Field(e, x) ->
+      (match type_expr e tenv with
+       | TClass c ->
+         (match List.assoc_opt x (all_attributes c) with
+          | Some t -> t
+          | None -> error (Printf.sprintf "Attribute %s is not defined for class %s" x c))
+       | t -> error (Printf.sprintf "Attribute %s accessed on a value of type %s"
+                       x (typ_to_string t)))
+  in
 
+  let rec check_instr i ret tenv = match i with
+    | Print e ->
+      if type_expr e tenv = TVoid then error "Cannot print a void value"
+    | Set(m, e) -> check e (type_mem_access m tenv) tenv
+    | If(e, s1, s2) ->
+      check e TBool tenv; check_seq s1 ret tenv; check_seq s2 ret tenv
+    | While(e, s) -> check e TBool tenv; check_seq s ret tenv
+    | Return e -> check e ret tenv
+    | Expr e -> ignore (type_expr e tenv)
+  and check_seq s ret tenv =
+    List.iter (fun i -> check_instr i ret tenv) s
+  in
+  (* Vrai si tous les chemins d'exécution de [s] passent par un return. *)
+  let rec returns s =
+    List.exists (function
+        | Return _ -> true
+        | If(_, s1, s2) -> returns s1 && returns s2
+        | While(Bool true, _) -> true (* boucle infinie : jamais de sortie sans return *)
+        | _ -> false) s
+  in
+
+  let globals = add_env p.globals Env.empty in
+  let check_method cl m =
+    check_typ m.return; check_decls m.params; check_decls m.locals;
+    if m.method_name = "constructor" && m.return <> TVoid then
+      error (Printf.sprintf "Constructor of class %s must return void" cl.class_name);
+    let tenv = add_env m.locals (add_env m.params globals) in
+    check_seq m.code m.return (Env.add "this" (TClass cl.class_name) tenv);
+    if m.return <> TVoid && not (returns m.code) then
+      error (Printf.sprintf "Method %s should return a value of type %s"
+               m.method_name (typ_to_string m.return))
+  in
+  let check_class cl =
+    ignore (ancestors [cl.class_name] cl.class_name);
+    check_decls cl.attributes;
+    List.iter (check_method cl) cl.methods
+  in
+
+  check_decls p.globals;
+  List.iter check_class p.classes;
+  check_seq p.main TVoid globals

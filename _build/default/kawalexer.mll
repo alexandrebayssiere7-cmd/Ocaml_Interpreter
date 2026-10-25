@@ -23,10 +23,9 @@
       "if", IF;
       "else", ELSE;
       "while", WHILE;
-
-
-     
-
+      "extends", EXTENDS;
+      "int", TINT;
+      "bool", TBOOL;
     ] ;
   fun s ->
     try  Hashtbl.find h s
@@ -35,7 +34,7 @@
 }
 
 let digit = ['0'-'9']
-let number = ['-']? digit+
+let number = digit+
 let alpha = ['a'-'z' 'A'-'Z']
 let ident = ['a'-'z' '_'] (alpha | '_' | digit)*
   
@@ -43,7 +42,7 @@ rule token = parse
   | ['\n']            { new_line lexbuf; token lexbuf }
   | [' ' '\t' '\r']+  { token lexbuf }
 
-  | "//" [^ '\n']* "\n"  { new_line lexbuf; token lexbuf }
+  | "//" [^ '\n']*      { token lexbuf }
   | "/*"                 { comment lexbuf; token lexbuf }
 
   | number as n  { INT(int_of_string n) }
@@ -69,11 +68,13 @@ rule token = parse
   | "," {COMMA}
   | ">" {GT}
   | ">=" {GE}
+  | "!"  {EXCL}
   | "%"  {REM}
   | _    { raise (Error ("unknown character : " ^ lexeme lexbuf)) }
   | eof  { EOF }
 
 and comment = parse
   | "*/" { () }
+  | '\n' { new_line lexbuf; comment lexbuf }
   | _    { comment lexbuf }
   | eof  { raise (Error "unterminated comment") }

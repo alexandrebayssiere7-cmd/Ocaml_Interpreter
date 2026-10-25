@@ -6,5 +6,4 @@
  (infer true))
 (executable
  (name kawai)
- (promote (until-clean))
- (flags ()))
+ (promote (until-clean)))
