@@ -1,0 +1,4 @@
+class a {}
+var a x;
+main {
+}

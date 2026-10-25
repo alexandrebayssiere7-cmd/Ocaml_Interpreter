@@ -1,0 +1,46 @@
+var int calls;
+var compteur c;
+
+class compteur {
+  attribute int n;
+
+  method void constructor(int n) {
+    this.n = n;
+  }
+
+  method int premier_multiple(int k) {
+    var int i;
+    i = 1;
+    while (true) {
+      calls = calls + 1;
+      if (i % k == 0) { return i; }
+      i = i + 1;
+    }
+  }
+
+  method bool est_positif() {
+    return !(this.n < 0);
+  }
+}
+
+class sous_compteur extends compteur {
+  method bool est_positif() {
+    return false;
+  }
+}
+
+main {
+  calls = 0;
+  c = new compteur(-3);
+  print(c.premier_multiple(4));
+  print(calls);
+  print(c.est_positif());
+  c = new sous_compteur(5);
+  print(c.n);
+  print(c.est_positif());
+  print(c == c && !(c == new compteur(5)));
+  /* commentaire
+     sur plusieurs lignes */
+  print(-2 * 3 + 10 / 2 % 3);
+}
+// commentaire final sans retour a la ligne

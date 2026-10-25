@@ -4,7 +4,12 @@
  (modules kawaparser)
  (flags --explain --dump)
  (infer true))
+(library
+ (name kawa_lib)
+ (wrapped false)
+ (modules kawa kawalexer kawaparser typechecker interpreter runner))
 (executable
  (name kawai)
- (promote (until-clean))
- (flags ()))
+ (modules kawai)
+ (libraries kawa_lib)
+ (promote (until-clean)))

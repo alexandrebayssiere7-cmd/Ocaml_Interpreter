@@ -1,0 +1,7 @@
+class a {
+  method int f() {
+    if (true) { return 1; }
+  }
+}
+main {
+}
